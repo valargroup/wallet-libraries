@@ -6,7 +6,7 @@
 [[source]]
 name = "librustzcash"
 url = "https://github.com/zcash/librustzcash.git"
-ref = "zcash_client_sqlite-0.22.0-rc.7"
+ref = "34f2b1e810ac8d00e671f0d254c7af7048c8985c"
 commit = "34f2b1e810ac8d00e671f0d254c7af7048c8985c"
 destination = "lrz/librustzcash"
 
