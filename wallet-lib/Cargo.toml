@@ -1,5 +1,5 @@
 [package]
-name = "zakura-wallet-deps"
+name = "zakura-wallet-lib"
 version = "0.1.0"
 authors = ["Zakura developers"]
 description = """
@@ -15,7 +15,7 @@ categories = ["cryptography::cryptocurrencies"]
 keywords = ["zcash", "zakura"]
 
 [lib]
-name = "zakura_wallet_deps"
+name = "zakura_wallet_lib"
 
 # Exactly one backend is active at a time, so each family is optional and
 # enabled by its own feature. Cargo features are additive and cannot express

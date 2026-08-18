@@ -6,7 +6,7 @@ on:
       - ".github/workflows/verify.yml"
       - "Cargo.lock"
       - "Cargo.toml"
-      - "compat/**"
+      - "wallet-lib/**"
       - "librustzcash/**"
       - "zakura/**"
       - "manifests/**"
@@ -31,7 +31,7 @@ jobs:
       - name: Check the wallet layer against the Zakura crypto stack
         run: ./scripts/verify-zakura-graph.sh
 
-  compat-modes:
+  wallet-lib-modes:
     # The facade selects between the two stacks, so it is built both ways and
     # each build is checked for crates from the other one.
     runs-on: ubuntu-latest
@@ -41,7 +41,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Build the facade against each backend
-        run: ./scripts/verify-compat-modes.sh
+        run: ./scripts/verify-wallet-lib-modes.sh
 
   reproducible:
     # `librustzcash/` and the root `Cargo.toml` are generated output: the pinned

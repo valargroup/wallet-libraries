@@ -6,7 +6,7 @@
 //! selected family through these re-exports:
 //!
 //! ```ignore
-//! use zakura_wallet_deps::{client_backend, orchard};
+//! use zakura_wallet_lib::{client_backend, orchard};
 //! ```
 //!
 //! The two families are API-compatible today — the Zakura forks differ only in
@@ -20,7 +20,7 @@
 //! forks. Vizor selects the other:
 //!
 //! ```toml
-//! zakura-wallet-deps = { version = "0.1", default-features = false, features = ["zakura"] }
+//! zakura-wallet-lib = { version = "0.1", default-features = false, features = ["zakura"] }
 //! ```
 //!
 //! The two are mutually exclusive. Cargo features are additive, so that cannot
