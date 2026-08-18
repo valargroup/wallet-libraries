@@ -57,6 +57,8 @@ scripts/
   sync-upstream.sh
   apply-patches.sh
   verify-zcash-voting.sh
+  discover-upstream-updates.py
+  inject-patch-entries.py
 consumers/
   zcash_voting.patch.example.toml
 ```
@@ -64,6 +66,9 @@ consumers/
 The sources are copied into the repository rather than added as submodules.
 This makes a single git revision a complete Cargo source and lets the sync
 workflow reapply a small patch series deterministically.
+
+See [`patches/README.md`](patches/README.md) for the complete procedure for
+creating, extending, regenerating, and retiring voting patches.
 
 ## Verify the voting build
 
@@ -75,6 +80,14 @@ The script checks out the pinned voting revision in a temporary directory,
 injects local path patches, and checks both `zcash_voting` and
 `vote-commitment-tree`. Cargo follows LRZ's internal path dependencies, keeping
 the transitive LRZ closure on the same source tree.
+
+A successful check is not by itself proof that the vendored sources were used.
+Cargo drops a `[patch]` entry whose version cannot satisfy the consumer's
+requirement with a warning, then builds against the registry copy, so a pin
+moved to a semver-incompatible release would otherwise pass silently. The
+script therefore also fails when any patch entry goes unused, and reads
+`cargo metadata` to confirm that every patched package resolves to exactly one
+copy inside `lrz/`.
 
 ## Consume from a wallet
 
@@ -123,6 +136,38 @@ An override updates both the human-readable ref and its resolved commit in
 reapplies ordered `*.patch` files. Run voting verification before accepting
 the result.
 
-The **Sync upstream releases** GitHub workflow performs the same operation,
-verifies voting compatibility, and opens a reviewable pull request. It does
-not auto-merge upstream updates.
+## Automatic upstream updates
+
+The **Sync upstream releases** workflow runs daily. It lists the tags of each
+source, keeps those matching the source's `tag_pattern` in
+`manifests/sources.toml`, and compares the highest semantic version against the
+current pin. `allow_prerelease` decides whether a prerelease tag may be
+proposed automatically; librustzcash allows it because the voting pin currently
+tracks a release candidate.
+
+Each source with a newer release is synced, verified, and raised as its own
+pull request on a long-lived `automation/upstream-sync/<source>` branch, so a
+failing update never blocks the other source and a later tag updates the open
+pull request instead of opening a second one. Nothing is auto-merged.
+
+Running the workflow by hand does the same discovery; filling in an input pins
+that source to an explicit tag or commit, which is how a prerelease or an
+older release gets selected deliberately.
+
+Reproducing the same discovery locally:
+
+```bash
+./scripts/discover-upstream-updates.py
+```
+
+Pull requests created with the default `GITHUB_TOKEN` do not trigger other
+workflows, so a sync pull request shows no checks even though the sync job
+verified the result before opening it. Setting an `UPSTREAM_SYNC_TOKEN` secret
+that may open pull requests makes `verify.yml` run on the branch as well.
+
+## Generated trees
+
+`lrz/` is generated output: the pinned upstream commit plus the ordered patch
+series. CI regenerates it on every pull request and fails if the result differs
+from what is committed, because a hand edit under `lrz/` would otherwise
+survive review and disappear at the next sync.

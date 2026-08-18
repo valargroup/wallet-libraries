@@ -2,6 +2,11 @@
 #
 # `ref` is the human-readable release tag. `commit` is the peeled commit that
 # the sync script verifies, so retagging cannot silently change the source.
+#
+# `tag_pattern` selects the upstream tags that represent a release of this
+# source, and must capture a `version` group used for semantic-version
+# ordering. `allow_prerelease` decides whether the scheduled discovery job may
+# propose a prerelease tag; a manual override can always pin one.
 
 [[source]]
 name = "librustzcash"
@@ -9,6 +14,11 @@ url = "https://github.com/zcash/librustzcash.git"
 ref = "zcash_client_sqlite-0.22.0-rc.7"
 commit = "34f2b1e810ac8d00e671f0d254c7af7048c8985c"
 destination = "lrz/librustzcash"
+# The librustzcash repository tags every crate independently. `zcash_voting`
+# selects the release train by its `zcash_client_sqlite` version, so that is
+# the tag series this repository follows.
+tag_pattern = "^zcash_client_sqlite-(?P<version>.+)$"
+allow_prerelease = true
 
 [[source]]
 name = "orchard"
@@ -16,6 +26,9 @@ url = "https://github.com/zcash/orchard.git"
 ref = "0.15.5"
 commit = "29d1d55db62153dcaeef8ef631c8991c53ed1248"
 destination = "lrz/orchard"
+# Orchard has used both bare and `v`-prefixed version tags over its history.
+tag_pattern = "^v?(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?)$"
+allow_prerelease = false
 
 [consumer.zcash_voting]
 url = "https://github.com/valargroup/zcash_voting.git"

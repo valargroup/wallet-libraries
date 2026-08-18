@@ -1,42 +1,77 @@
 name: Sync upstream releases
 
 on:
+  schedule:
+    # Daily upstream tag check. Scheduled runs only fire on the default branch.
+    - cron: "17 6 * * *"
   workflow_dispatch:
     inputs:
       librustzcash_ref:
-        description: "zcash/librustzcash tag or commit (blank keeps current pin)"
+        description: "zcash/librustzcash tag or commit (blank discovers the newest release)"
         required: false
         type: string
       orchard_ref:
-        description: "zcash/orchard tag or commit (blank keeps current pin)"
+        description: "zcash/orchard tag or commit (blank discovers the newest release)"
         required: false
         type: string
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
-  sync:
+  discover:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
+    outputs:
+      targets: ${{ steps.discover.outputs.targets }}
     steps:
       - name: Check out wallet libraries
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Refresh selected upstream trees
+      - name: Find sources with a newer upstream release
+        id: discover
         env:
           LIBRUSTZCASH_REF: ${{ inputs.librustzcash_ref }}
           ORCHARD_REF: ${{ inputs.orchard_ref }}
         run: |
           args=()
           if [[ -n "$LIBRUSTZCASH_REF" ]]; then
-            args+=("librustzcash=$LIBRUSTZCASH_REF")
+            args+=(--override "librustzcash=$LIBRUSTZCASH_REF")
           fi
           if [[ -n "$ORCHARD_REF" ]]; then
-            args+=("orchard=$ORCHARD_REF")
+            args+=(--override "orchard=$ORCHARD_REF")
           fi
-          ./scripts/sync-upstream.sh "${args[@]}"
+          targets="$(./scripts/discover-upstream-updates.py "${args[@]}")"
+          echo "targets=$targets" >> "$GITHUB_OUTPUT"
+
+  sync:
+    needs: discover
+    if: needs.discover.outputs.targets != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      pull-requests: write
+    strategy:
+      # One pull request per source keeps a failing update from blocking the
+      # other, and keeps each branch reviewable on its own.
+      fail-fast: false
+      matrix:
+        target: ${{ fromJson(needs.discover.outputs.targets) }}
+    concurrency:
+      group: upstream-sync-${{ matrix.target.name }}
+      cancel-in-progress: true
+    steps:
+      - name: Check out wallet libraries
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Sync ${{ matrix.target.name }}
+        env:
+          # Passed through the environment: a tag name is upstream-controlled
+          # input and must not be interpolated into the shell command itself.
+          SOURCE_NAME: ${{ matrix.target.name }}
+          SOURCE_REF: ${{ matrix.target.ref }}
+        run: ./scripts/sync-upstream.sh "$SOURCE_NAME=$SOURCE_REF"
 
       - name: Verify zcash_voting compatibility
         run: ./scripts/verify-zcash-voting.sh
@@ -44,12 +79,31 @@ jobs:
       - name: Open upstream sync pull request
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
         with:
-          branch: automation/upstream-sync
+          # `UPSTREAM_SYNC_TOKEN` is optional. Pull requests created with the
+          # default `GITHUB_TOKEN` do not trigger `verify.yml`, so without it a
+          # sync pull request shows no checks even though this job verified the
+          # result. Set it to a token that may open pull requests to get the
+          # same verification re-run on the branch, independently of this job.
+          token: ${{ secrets.UPSTREAM_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
+          # One long-lived branch per source: a newer upstream tag updates the
+          # open pull request instead of opening a second one.
+          branch: automation/upstream-sync/${{ matrix.target.name }}
           delete-branch: true
-          commit-message: "chore: sync upstream wallet libraries"
-          title: "chore: sync upstream wallet libraries"
+          commit-message: "chore: sync ${{ matrix.target.name }} to ${{ matrix.target.ref }}"
+          title: "chore: sync ${{ matrix.target.name }} to ${{ matrix.target.ref }}"
           body: |
-            Refreshes the pinned upstream LRZ/Orchard source trees and reapplies
-            the minimal voting patch set.
+            Moves the pinned `${{ matrix.target.name }}` tree to
+            `${{ matrix.target.ref }}` and reapplies the voting patch set.
 
-            `zcash_voting` verification passed before this PR was opened.
+            Verified before this pull request was written:
+
+            - every `[patch.crates-io]` entry took part in the build;
+            - `zcash_voting` and `vote-commitment-tree` check against the
+              synced sources;
+            - each patched package resolves to exactly one vendored copy.
+
+            Run:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Consumers must move their own `wallet-libraries` revision after
+            this merges; Cargo `[patch]` settings are not inherited.
