@@ -27,3 +27,34 @@ jobs:
 
       - name: Check zcash_voting against synced sources
         run: ./scripts/verify-zcash-voting.sh
+
+  reproducible:
+    # `lrz/` is generated output: pinned upstream commit plus the ordered patch
+    # series. Regenerating it must be a no-op, otherwise a hand edit is sitting
+    # in the tree that the next upstream sync would silently discard.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out wallet libraries
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Regenerate the vendored trees from their pins
+        run: ./scripts/sync-upstream.sh
+
+      - name: Fail on drift between the trees and the patch series
+        run: |
+          if ! git diff --quiet -- lrz manifests; then
+            echo "lrz/ does not match its pinned upstream commit plus patches:" >&2
+            git --no-pager diff --stat -- lrz manifests >&2
+            echo >&2
+            echo "Move the change into patches/<source>/ and regenerate." >&2
+            exit 1
+          fi
+          # `--ignored` matters here: an upstream `.gitignore` inside a
+          # vendored tree can quietly keep a synced file out of the commit.
+          stray="$(git status --porcelain --untracked-files=all --ignored=matching -- lrz)"
+          if [[ -n "$stray" ]]; then
+            echo "sync produced files that are untracked or ignored:" >&2
+            echo "$stray" >&2
+            exit 1
+          fi
