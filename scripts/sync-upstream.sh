@@ -4,7 +4,7 @@ set -euo pipefail
 # Regenerate the vendored wallet-layer crates from the pinned librustzcash
 # release. The vendored directory named in manifests/sources.toml, plus the
 # root Cargo.toml, is generated output: this script is the only supported way
-# to produce it. Hand-written members (compat/, zakura/) are never touched.
+# to produce it. Hand-written members (wallet-lib/, zakura/) are never touched.
 #
 #   ./scripts/sync-upstream.sh                              refresh the pin
 #   ./scripts/sync-upstream.sh librustzcash=<tag-or-commit> move the pin

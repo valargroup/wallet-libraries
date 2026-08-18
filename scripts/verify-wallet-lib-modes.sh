@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build the compatibility facade both ways and prove each build reaches exactly
+# Build the wallet-lib facade both ways and prove each build reaches exactly
 # one stack.
 #
 # The facade is the only crate here whose features are mutually exclusive, so it
@@ -13,14 +13,21 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 manifest="$repo_root/manifests/sources.toml"
 
-export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$repo_root/target/verify-compat-modes}"
+export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$repo_root/target/verify-wallet-lib-modes}"
 
-facade="$(python3 - "$repo_root/compat/Cargo.toml" <<'PY'
+# The facade's package name, read through the directory the manifest names.
+facade="$(python3 - "$manifest" "$repo_root" <<'PY'
 import sys
 import tomllib
+from pathlib import Path
 
-with open(sys.argv[1], "rb") as manifest_file:
-    print(tomllib.load(manifest_file)["package"]["name"])
+manifest_path, repo_root = Path(sys.argv[1]), Path(sys.argv[2])
+
+with manifest_path.open("rb") as manifest_file:
+    directory = tomllib.load(manifest_file)["layout"]["facade"]
+
+with (repo_root / directory / "Cargo.toml").open("rb") as facade_manifest:
+    print(tomllib.load(facade_manifest)["package"]["name"])
 PY
 )"
 

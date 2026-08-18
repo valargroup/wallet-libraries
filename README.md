@@ -40,16 +40,16 @@ its upstream name.
 
 ## Layout
 
-Three directories, following the split Dev sketched:
+Three directories:
 
 ```text
 librustzcash/   forked upstream crates   generated; sync deletes and rewrites it
-compat/         the backend selector     hand-written
+wallet-lib/     the backend selector     hand-written
 zakura/         new Zakura work          hand-written; empty for now
 ```
 
 Only `librustzcash/` and the root `Cargo.toml` are generated. Anything
-hand-written goes in `compat/` or `zakura/` and is listed in
+hand-written goes in `wallet-lib/` or `zakura/` and is listed in
 `layout.extra_members` in `manifests/sources.toml`, which the workspace
 generator appends to the members it produces — a crate placed under
 `librustzcash/` would be deleted by the next sync.
@@ -87,20 +87,20 @@ fine here and fails later where the two type families meet.
 
 ## Selecting a backend
 
-`compat/` holds `zakura-wallet-deps`, which exists for code that has to build
+`wallet-lib/` holds `zakura-wallet-lib`, which exists for code that has to build
 for **both** ZODL and Vizor from one source tree — `zcash_voting` and the vote
 commitment tree. It re-exports one family under stable names:
 
 ```rust
-use zakura_wallet_deps::{client_backend, orchard};
+use zakura_wallet_lib::{client_backend, orchard};
 ```
 
 ```toml
 # ZODL: upstream, the default
-zakura-wallet-deps = "0.1"
+zakura-wallet-lib = "0.1"
 
 # Vizor: the forks
-zakura-wallet-deps = { version = "0.1", default-features = false, features = ["zakura"] }
+zakura-wallet-lib = { version = "0.1", default-features = false, features = ["zakura"] }
 ```
 
 The two features are mutually exclusive. Cargo features are additive and there
@@ -109,7 +109,7 @@ family needs its own named feature rather than being the implicit
 `not(zakura)` case — which is why selecting `zakura` also requires
 `default-features = false`. Enabling both, or neither, is a compile error.
 
-`scripts/verify-compat-modes.sh` builds it each way and fails if a crate from
+`scripts/verify-wallet-lib-modes.sh` builds it each way and fails if a crate from
 the other family appears, or if the mutually-exclusive rules stop holding.
 
 An end consumer that builds for exactly one stack does not need this crate at
@@ -167,7 +167,7 @@ that may open pull requests makes `verify.yml` run on the branch as well.
 
 ```text
 librustzcash/           vendored wallet-layer crates (generated)
-compat/                 zakura-wallet-deps, the backend selector
+wallet-lib/             zakura-wallet-lib, the backend selector
 zakura/                 new Zakura work
 Cargo.toml              workspace manifest (generated)
 patches/                ordered patches per crate, relative to the crate root
@@ -178,7 +178,7 @@ scripts/
   apply-renames.py            package renames and sibling path links
   apply-patches.sh            ordered patch series for one crate
   verify-zakura-graph.sh      build and graph-purity check
-  verify-compat-modes.sh      build the facade against each backend
+  verify-wallet-lib-modes.sh  build the facade against each backend
   discover-upstream-updates.py
 ```
 

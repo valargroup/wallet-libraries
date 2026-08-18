@@ -15,7 +15,7 @@ members = [
     "librustzcash/zcash_client_sqlite",
     "librustzcash/zcash_pool_migration",
     "librustzcash/zcash_pool_migration_memory",
-    "compat",
+    "wallet-lib",
 ]
 
 resolver = "2"

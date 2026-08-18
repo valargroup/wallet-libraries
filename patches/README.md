@@ -4,7 +4,7 @@
 corresponding ordered patch in this directory: the next upstream sync replaces
 each crate directory before reapplying its patch series, and CI regenerates the
 tree on every pull request and fails if the result differs from what is
-committed. Hand-written code lives in `compat/` and `zakura/`, which sync
+committed. Hand-written code lives in `wallet-lib/` and `zakura/`, which sync
 never touches.
 
 There are currently **no patches**. The Zakura rewiring is expressed entirely

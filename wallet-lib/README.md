@@ -1,4 +1,4 @@
-# `zakura-wallet-deps`
+# `zakura-wallet-lib`
 
 Selects either the upstream librustzcash wallet stack (`lrz`, the default) or
 its Zakura forks (`zakura`), and re-exports the selected family under stable
