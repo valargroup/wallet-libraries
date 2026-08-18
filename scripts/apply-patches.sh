@@ -1,19 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-source_name="${1:-}"
+# Apply the ordered patch series for one vendored crate, if it has one.
+# Patches are generated relative to the crate directory, not the upstream
+# repository root, because only the crate directory is vendored.
 
-if [[ -z "$source_name" ]]; then
-  echo "usage: $0 <source-name>" >&2
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+crate_path="${1:-}"
+
+if [[ -z "$crate_path" ]]; then
+  echo "usage: $0 <crate-directory-name>" >&2
   exit 2
 fi
 
-source_dir="$repo_root/lrz/$source_name"
-patch_dir="$repo_root/patches/$source_name"
+source_dir="$repo_root/crates/$crate_path"
+patch_dir="$repo_root/patches/$crate_path"
 
 if [[ ! -d "$source_dir" ]]; then
-  echo "source tree does not exist: $source_dir" >&2
+  echo "vendored crate does not exist: $source_dir" >&2
   exit 1
 fi
 

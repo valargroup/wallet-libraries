@@ -10,10 +10,6 @@ on:
         description: "zcash/librustzcash tag or commit (blank discovers the newest release)"
         required: false
         type: string
-      orchard_ref:
-        description: "zcash/orchard tag or commit (blank discovers the newest release)"
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -32,14 +28,10 @@ jobs:
         id: discover
         env:
           LIBRUSTZCASH_REF: ${{ inputs.librustzcash_ref }}
-          ORCHARD_REF: ${{ inputs.orchard_ref }}
         run: |
           args=()
           if [[ -n "$LIBRUSTZCASH_REF" ]]; then
             args+=(--override "librustzcash=$LIBRUSTZCASH_REF")
-          fi
-          if [[ -n "$ORCHARD_REF" ]]; then
-            args+=(--override "orchard=$ORCHARD_REF")
           fi
           targets="$(./scripts/discover-upstream-updates.py "${args[@]}")"
           echo "targets=$targets" >> "$GITHUB_OUTPUT"
@@ -73,8 +65,8 @@ jobs:
           SOURCE_REF: ${{ matrix.target.ref }}
         run: ./scripts/sync-upstream.sh "$SOURCE_NAME=$SOURCE_REF"
 
-      - name: Verify zcash_voting compatibility
-        run: ./scripts/verify-zcash-voting.sh
+      - name: Verify the Zakura-only dependency graph
+        run: ./scripts/verify-zakura-graph.sh
 
       - name: Open upstream sync pull request
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
@@ -97,13 +89,12 @@ jobs:
 
             Verified before this pull request was written:
 
-            - every `[patch.crates-io]` entry took part in the build;
-            - `zcash_voting` and `vote-commitment-tree` check against the
-              synced sources;
-            - each patched package resolves to exactly one vendored copy.
+            - the whole workspace checks with all targets and all features;
+            - no crates.io original of a `zakura-*` fork entered the graph;
+            - every vendored crate resolves to exactly one copy.
 
             Run:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-            Consumers must move their own `wallet-libraries` revision after
-            this merges; Cargo `[patch]` settings are not inherited.
+            Consumers pin these crates by git revision until they are
+            published, so their pins need moving after this merges.
