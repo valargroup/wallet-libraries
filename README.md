@@ -1,160 +1,112 @@
-# Valargroup wallet libraries
+# Zakura wallet libraries
 
-Upstream-compatible Rust library trees for wallets that integrate Zcash
-voting.
+The wallet layer of the Zakura stack: the librustzcash crates a wallet needs
+that [`zakura-core/libraries`](https://github.com/zakura-core/libraries) does
+not already ship, forked and rewired onto the published `zakura-*` crypto
+crates.
 
-This repository keeps the original Cargo package names (`zcash_*`, `orchard`,
-and related crates), so a wallet can select the whole compatible graph with
-Cargo `[patch.crates-io]` entries pinned to one git revision.
+`libraries` covers the proving stack and the crates that sit directly on top of
+it — `zakura-primitives`, `zakura-keys`, `zakura-proofs`, `zakura-orchard`, the
+halo2 family. It stops below the wallet layer, so a wallet consuming it still
+resolves `zcash_client_backend` and `zcash_client_sqlite` from crates.io, which
+drags the crates.io `orchard` and `zcash_primitives` back into the graph
+alongside their Zakura forks. This repository closes that gap.
 
-## Why this is separate from `zakura-core/libraries`
+## What is vendored
 
-[`zakura-core/libraries`](https://github.com/zakura-core/libraries) is
-Zakura's product fork of the proving stack. Its packages are intentionally
-published under `zakura-*` names. That is the right model for Zakura, but
-those names cannot replace the upstream-named packages in wallets that still
-consume `zcash_voting` and librustzcash crates.
+| Directory | Published as | Forked from |
+| --- | --- | --- |
+| `crates/pczt` | `zakura-pczt` | `zcash/librustzcash` |
+| `crates/zcash_client_backend` | `zakura-client-backend` | `zcash/librustzcash` |
+| `crates/zcash_client_sqlite` | `zakura-client-sqlite` | `zcash/librustzcash` |
+| `crates/zcash_pool_migration` | `zakura-pool-migration` | `zcash/librustzcash` |
+| `crates/zcash_pool_migration_memory` | not published | `zcash/librustzcash` |
 
-This repository is the compatibility counterpart:
+Directory names and library target names keep their upstream spelling, so crate
+sources and `use` paths are untouched; only the package name changes. This is
+the convention `libraries` already follows.
 
-- source trees retain their upstream names and layout;
-- releases are copied from official Zcash upstream tags;
-- voting-specific changes, if needed, live as a small, reviewable patch set;
-- CI proves that the pinned `zcash_voting` revision builds against the result.
+**Membership rule.** A crate belongs here when it depends on the renamed crypto
+stack and `libraries` does not already ship it. A crate that `zakura-*` resolves
+from crates.io must *not* be vendored here — two copies of a package whose types
+cross the boundary are two different types, and the build only fails later, in a
+consumer. `zcash_address`, `zip321`, `zcash_protocol`, `zcash_transparent`,
+`zcash_encoding` and `equihash` therefore stay on crates.io.
 
-It does not replace `zakura-core/libraries`,
-`valargroup/librustzcash`, or the local orchestration in
-`valargroup/shielded-vote-workspace`.
+`zcash_pool_migration_memory` is the one exception to the naming rule: it is a
+test-only path dev-dependency of `zcash_pool_migration`, and Cargo drops
+path-only dev-dependencies when publishing, so it is never published and keeps
+its upstream name.
 
-## Current baseline
+## How the rewiring works
 
-Pins are recorded in [`manifests/sources.toml`](manifests/sources.toml):
+Nothing is patched at the source level. `manifests/sources.toml` holds a
+`[rewire]` table, and the generated root `Cargo.toml` turns each entry into a
+Cargo dependency rename:
 
-- `zcash/librustzcash` at `zcash_client_sqlite-0.22.0-rc.7`
-- `zcash/orchard` at `0.15.5`
-- `valargroup/zcash_voting` at a fixed commit on its 3.0.0 line
-
-The selected librustzcash tag contains the matching versions of
-`zcash_client_backend`, `zcash_client_sqlite`, `zcash_keys`,
-`zcash_primitives`, `zcash_protocol`, and `pczt`.
-
-The initial prototype requires **no functional patches**. Clean upstream
-sources build `zcash_voting` and `vote-commitment-tree`; the patch directories
-are ready for the first voting-only delta that cannot be carried upstream.
-
-## Layout
-
-```text
-lrz/
-  librustzcash/       vendored zcash/librustzcash release tree
-  orchard/            vendored zcash/orchard release tree
-patches/
-  librustzcash/       ordered patches relative to the LRZ repository root
-  orchard/            ordered patches relative to the Orchard repository root
-manifests/
-  sources.toml        upstream refs and immutable peeled commits
-scripts/
-  sync-upstream.sh
-  apply-patches.sh
-  verify-zcash-voting.sh
-  discover-upstream-updates.py
-  inject-patch-entries.py
-consumers/
-  zcash_voting.patch.example.toml
+```toml
+orchard = { version = "1.0.0-rc.1", package = "zakura-orchard" }
 ```
 
-The sources are copied into the repository rather than added as submodules.
-This makes a single git revision a complete Cargo source and lets the sync
-workflow reapply a small patch series deterministically.
+The dependency key stays `orchard`, so every `orchard::` path in the vendored
+sources keeps compiling, while the package that satisfies it is the fork. The
+vendored crates inherit these through `workspace = true`, which is why the fork
+currently carries **no source patches at all**.
 
-See [`patches/README.md`](patches/README.md) for the complete procedure for
-creating, extending, regenerating, and retiring voting patches.
+There is no `[patch.crates-io]` anywhere in this design. Package names differ
+from their upstream originals, so consumers declare these crates directly and
+every edge is explicit — the same reasoning `libraries` documents.
 
-## Verify the voting build
+## Verify
 
 ```bash
-./scripts/verify-zcash-voting.sh
+./scripts/verify-zakura-graph.sh
 ```
 
-The script checks out the pinned voting revision in a temporary directory,
-injects local path patches, and checks both `zcash_voting` and
-`vote-commitment-tree`. Cargo follows LRZ's internal path dependencies, keeping
-the transitive LRZ closure on the same source tree.
-
-A successful check is not by itself proof that the vendored sources were used.
-Cargo drops a `[patch]` entry whose version cannot satisfy the consumer's
-requirement with a warning, then builds against the registry copy, so a pin
-moved to a semver-incompatible release would otherwise pass silently. The
-script therefore also fails when any patch entry goes unused, and reads
-`cargo metadata` to confirm that every patched package resolves to exactly one
-copy inside `lrz/`.
+Checks the workspace with all targets and all features, then reads
+`cargo metadata` to prove the resolved graph is Zakura-only: no crates.io
+original of a forked crate is present, and no vendored crate appears twice.
+Compiling alone would not prove this — an edge that escapes the rewiring builds
+fine here and fails later where the two type families meet.
 
 ## Consume from a wallet
 
-For local development, copy the entries from
-[`consumers/zcash_voting.patch.example.toml`](consumers/zcash_voting.patch.example.toml)
-and adjust the relative paths.
-
-For a remote consumer, point every entry at the same repository revision:
+Until these crates are published, pin them by git revision. The dependency keys
+keep their upstream names, so wallet source needs no changes:
 
 ```toml
-[patch.crates-io]
-zcash_client_backend = { git = "https://github.com/valargroup/wallet-libraries.git", rev = "<commit>" }
-zcash_client_sqlite = { git = "https://github.com/valargroup/wallet-libraries.git", rev = "<commit>" }
-zcash_keys = { git = "https://github.com/valargroup/wallet-libraries.git", rev = "<commit>" }
-zcash_primitives = { git = "https://github.com/valargroup/wallet-libraries.git", rev = "<commit>" }
-zcash_protocol = { git = "https://github.com/valargroup/wallet-libraries.git", rev = "<commit>" }
-pczt = { git = "https://github.com/valargroup/wallet-libraries.git", rev = "<commit>" }
-orchard = { git = "https://github.com/valargroup/wallet-libraries.git", rev = "<commit>" }
+zcash_client_backend = { git = "https://github.com/valargroup/wallet-libraries.git", rev = "<commit>", package = "zakura-client-backend" }
+zcash_client_sqlite = { git = "https://github.com/valargroup/wallet-libraries.git", rev = "<commit>", package = "zakura-client-sqlite" }
+pczt = { git = "https://github.com/valargroup/wallet-libraries.git", rev = "<commit>", package = "zakura-pczt" }
 ```
 
-Cargo searches nested directories in git dependencies by package name, so the
-`lrz/` subdirectory does not appear in the remote form.
-
-All patched packages must use the same revision. Mixing registry and vendored
-copies of packages that exchange public types can produce incompatible Rust
-types even when the package versions match.
+The crypto stack comes from crates.io as `zakura-*`; do not also declare the
+upstream crates.
 
 ## Sync an upstream release
 
-Refresh the currently pinned trees:
-
 ```bash
-./scripts/sync-upstream.sh
+./scripts/sync-upstream.sh                                  # refresh the pin
+./scripts/sync-upstream.sh librustzcash=<tag-or-commit>     # move the pin
 ```
 
-Move either pin to a new tag or commit:
-
-```bash
-./scripts/sync-upstream.sh \
-  librustzcash=zcash_client_sqlite-0.22.0 \
-  orchard=0.16.0
-```
-
-An override updates both the human-readable ref and its resolved commit in
-`manifests/sources.toml`. The script then replaces the vendored tree and
-reapplies ordered `*.patch` files. Run voting verification before accepting
-the result.
+The script extracts the vendored crate directories and the upstream workspace
+manifest at the pinned commit, regenerates the root `Cargo.toml` through
+`scripts/generate-workspace.py`, applies the package renames, and reapplies any
+patch series. `crates/` and `Cargo.toml` are generated output; CI regenerates
+them on every pull request and fails on drift.
 
 ## Automatic upstream updates
 
-The **Sync upstream releases** workflow runs daily. It lists the tags of each
-source, keeps those matching the source's `tag_pattern` in
-`manifests/sources.toml`, and compares the highest semantic version against the
-current pin. `allow_prerelease` decides whether a prerelease tag may be
-proposed automatically; librustzcash allows it because the voting pin currently
-tracks a release candidate.
+The **Sync upstream releases** workflow runs daily. It lists the upstream tags,
+keeps those matching `tag_pattern` in `manifests/sources.toml` — the
+`zcash_client_sqlite` release train, which is how `zcash_voting` selects its LRZ
+version — and compares the highest semantic version against the current pin.
+`allow_prerelease` decides whether a prerelease may be proposed automatically.
 
-Each source with a newer release is synced, verified, and raised as its own
-pull request on a long-lived `automation/upstream-sync/<source>` branch, so a
-failing update never blocks the other source and a later tag updates the open
-pull request instead of opening a second one. Nothing is auto-merged.
-
-Running the workflow by hand does the same discovery; filling in an input pins
-that source to an explicit tag or commit, which is how a prerelease or an
-older release gets selected deliberately.
-
-Reproducing the same discovery locally:
+A newer release is synced, verified, and raised as a pull request on the
+long-lived `automation/upstream-sync/librustzcash` branch. Nothing is
+auto-merged. The same discovery runs locally:
 
 ```bash
 ./scripts/discover-upstream-updates.py
@@ -165,9 +117,24 @@ workflows, so a sync pull request shows no checks even though the sync job
 verified the result before opening it. Setting an `UPSTREAM_SYNC_TOKEN` secret
 that may open pull requests makes `verify.yml` run on the branch as well.
 
-## Generated trees
+## Layout
 
-`lrz/` is generated output: the pinned upstream commit plus the ordered patch
-series. CI regenerates it on every pull request and fails if the result differs
-from what is committed, because a hand edit under `lrz/` would otherwise
-survive review and disappear at the next sync.
+```text
+crates/                 vendored wallet-layer crates (generated)
+Cargo.toml              workspace manifest (generated)
+patches/                ordered patches per crate, relative to the crate root
+manifests/sources.toml  upstream pin, vendored crate list, rewiring rules
+scripts/
+  sync-upstream.sh            regenerate everything from the pin
+  generate-workspace.py       root manifest from the upstream workspace
+  apply-renames.py            package renames and sibling path links
+  apply-patches.sh            ordered patch series for one crate
+  verify-zakura-graph.sh      build and graph-purity check
+  discover-upstream-updates.py
+```
+
+## Status
+
+Not yet moved to the Zakura organization, and not yet published.
+`zakura-pool-migration` still needs a name reservation in
+`zakura-core/reserved`; the other published names are already reserved there.

@@ -4,8 +4,9 @@ on:
   pull_request:
     paths:
       - ".github/workflows/verify.yml"
-      - "consumers/**"
-      - "lrz/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "crates/**"
       - "manifests/**"
       - "patches/**"
       - "scripts/**"
@@ -18,41 +19,42 @@ permissions:
   contents: read
 
 jobs:
-  zcash-voting:
+  zakura-graph:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Check out wallet libraries
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Check zcash_voting against synced sources
-        run: ./scripts/verify-zcash-voting.sh
+      - name: Check the wallet layer against the Zakura crypto stack
+        run: ./scripts/verify-zakura-graph.sh
 
   reproducible:
-    # `lrz/` is generated output: pinned upstream commit plus the ordered patch
-    # series. Regenerating it must be a no-op, otherwise a hand edit is sitting
-    # in the tree that the next upstream sync would silently discard.
+    # `crates/` and the root `Cargo.toml` are generated output: the pinned
+    # upstream commit, plus the rename rules, plus the ordered patch series.
+    # Regenerating must be a no-op, otherwise a hand edit is sitting in the
+    # tree that the next upstream sync would silently discard.
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - name: Check out wallet libraries
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Regenerate the vendored trees from their pins
+      - name: Regenerate the vendored crates from their pin
         run: ./scripts/sync-upstream.sh
 
-      - name: Fail on drift between the trees and the patch series
+      - name: Fail on drift between the tree and its inputs
         run: |
-          if ! git diff --quiet -- lrz manifests; then
-            echo "lrz/ does not match its pinned upstream commit plus patches:" >&2
-            git --no-pager diff --stat -- lrz manifests >&2
+          if ! git diff --quiet -- crates Cargo.toml manifests; then
+            echo "the generated tree does not match its pinned inputs:" >&2
+            git --no-pager diff --stat -- crates Cargo.toml manifests >&2
             echo >&2
-            echo "Move the change into patches/<source>/ and regenerate." >&2
+            echo "Move the change into patches/<crate>/ and regenerate." >&2
             exit 1
           fi
           # `--ignored` matters here: an upstream `.gitignore` inside a
-          # vendored tree can quietly keep a synced file out of the commit.
-          stray="$(git status --porcelain --untracked-files=all --ignored=matching -- lrz)"
+          # vendored crate can quietly keep a synced file out of the commit.
+          stray="$(git status --porcelain --untracked-files=all --ignored=matching -- crates)"
           if [[ -n "$stray" ]]; then
             echo "sync produced files that are untracked or ignored:" >&2
             echo "$stray" >&2
