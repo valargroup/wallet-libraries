@@ -10,12 +10,24 @@ ref = "zcash_client_sqlite-0.22.0-rc.7"
 commit = "34f2b1e810ac8d00e671f0d254c7af7048c8985c"
 destination = "lrz/librustzcash"
 
-[[source]]
-name = "orchard"
-url = "https://github.com/zcash/orchard.git"
-ref = "0.15.5"
-commit = "29d1d55db62153dcaeef8ef631c8991c53ed1248"
-destination = "lrz/orchard"
+[zakura]
+url = "https://github.com/zakura-core/libraries.git"
+source_commit = "80a5dd73bc12f6a513c6afd14488911f11f2a9db"
+# Last source snapshot before the packages were renamed to `zakura-*`.
+# Its manifests preserve the upstream package names and version requirements.
+metadata_commit = "b44390bc487a37187a161b5b0f2536a6567afa8e"
+packages = [
+    "halo2_gadgets",
+    "halo2_legacy_pdqsort",
+    "halo2_poseidon",
+    "halo2_proofs",
+    "orchard",
+    "pasta_curves",
+    "reddsa",
+    "redjubjub",
+    "sapling-crypto",
+    "sinsemilla",
+]
 
 [consumer.zcash_voting]
 url = "https://github.com/valargroup/zcash_voting.git"

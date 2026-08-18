@@ -7,10 +7,6 @@ on:
         description: "zcash/librustzcash tag or commit (blank keeps current pin)"
         required: false
         type: string
-      orchard_ref:
-        description: "zcash/orchard tag or commit (blank keeps current pin)"
-        required: false
-        type: string
 
 permissions:
   contents: write
@@ -27,16 +23,15 @@ jobs:
       - name: Refresh selected upstream trees
         env:
           LIBRUSTZCASH_REF: ${{ inputs.librustzcash_ref }}
-          ORCHARD_REF: ${{ inputs.orchard_ref }}
         run: |
           args=()
           if [[ -n "$LIBRUSTZCASH_REF" ]]; then
             args+=("librustzcash=$LIBRUSTZCASH_REF")
           fi
-          if [[ -n "$ORCHARD_REF" ]]; then
-            args+=("orchard=$ORCHARD_REF")
-          fi
           ./scripts/sync-upstream.sh "${args[@]}"
+
+      - name: Verify Zakura source snapshot
+        run: ./scripts/verify-zakura-import.sh
 
       - name: Verify zcash_voting compatibility
         run: ./scripts/verify-zcash-voting.sh
@@ -44,12 +39,13 @@ jobs:
       - name: Open upstream sync pull request
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
         with:
-          branch: automation/upstream-sync
+          branch: adam/automation-upstream-sync
           delete-branch: true
           commit-message: "chore: sync upstream wallet libraries"
-          title: "chore: sync upstream wallet libraries"
+          title: "DRAFT: Sync upstream wallet libraries"
+          draft: true
           body: |
-            Refreshes the pinned upstream LRZ/Orchard source trees and reapplies
-            the minimal voting patch set.
+            Refreshes the pinned upstream LRZ source tree and reapplies the
+            minimal voting patch set. The Zakura source snapshot remains pinned.
 
             `zcash_voting` verification passed before this PR was opened.

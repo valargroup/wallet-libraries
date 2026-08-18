@@ -1,0 +1,32 @@
+name: CI
+
+on: [push]
+
+jobs:
+  test_msrv:
+    name: build on MSRV
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6.0.2
+    - uses: dtolnay/rust-toolchain@1.88.0
+    # The nightly job below tests all features; keep the MSRV job on defaults.
+    - run: cargo build
+  test_nightly:
+    name: test on nightly
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6.0.2
+    - uses: dtolnay/rust-toolchain@nightly
+    # Update dependencies since we commit the lockfile
+    - run: cargo update --verbose
+    - run: cargo test --all-features
+  build_no_std:
+    name: build with no_std
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6.0.2
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
+        targets: thumbv6m-none-eabi
+    - run: cargo build --no-default-features --target thumbv6m-none-eabi

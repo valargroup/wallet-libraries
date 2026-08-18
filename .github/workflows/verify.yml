@@ -25,5 +25,8 @@ jobs:
       - name: Check out wallet libraries
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      - name: Verify Zakura source snapshot
+        run: ./scripts/verify-zakura-import.sh
+
       - name: Check zcash_voting against synced sources
         run: ./scripts/verify-zcash-voting.sh

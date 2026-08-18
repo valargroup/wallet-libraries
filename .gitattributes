@@ -1,0 +1,2 @@
+# Vendored sources are verified against immutable upstream revisions.
+lrz/** -whitespace
