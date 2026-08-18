@@ -80,7 +80,12 @@ snapshot still matches its immutable source pin.
 ```bash
 ./scripts/verify-zakura-import.sh
 ./scripts/verify-zcash-voting.sh
+./scripts/verify-zcash-voting.sh --git-source
 ```
+
+The Git-source check uses the current commit through a local `file://` URL. It
+proves that Cargo finds every nested package exactly as a remote root patch
+would.
 
 The script checks out the pinned voting revision in a temporary directory,
 injects local path patches, and checks both `zcash_voting` and

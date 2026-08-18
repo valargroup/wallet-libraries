@@ -6,6 +6,18 @@ manifest="$repo_root/manifests/sources.toml"
 tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/wallet-libraries-verify.XXXXXX")"
 trap 'rm -rf "$tmp_root"' EXIT
 
+patch_mode="path"
+git_url=""
+git_rev=""
+if [[ "${1:-}" == "--git-source" ]]; then
+  patch_mode="git"
+  git_url="file://$repo_root"
+  git_rev="$(git -C "$repo_root" rev-parse HEAD)"
+elif [[ $# -ne 0 ]]; then
+  echo "usage: $0 [--git-source]" >&2
+  exit 2
+fi
+
 read -r voting_url voting_rev < <(
   python3 - "$manifest" <<'PY'
 import sys
@@ -49,12 +61,13 @@ for path in \
   fi
 done
 
-python3 - "$checkout/Cargo.toml" "$repo_root" <<'PY'
+python3 - "$checkout/Cargo.toml" "$repo_root" "$patch_mode" "$git_url" "$git_rev" <<'PY'
 import sys
 from pathlib import Path
 
 manifest_path = Path(sys.argv[1])
 repo_root = Path(sys.argv[2])
+patch_mode, git_url, git_rev = sys.argv[3:]
 text = manifest_path.read_text()
 
 patches = {
@@ -77,9 +90,15 @@ patches = {
     "zcash_proofs": repo_root / "lrz/librustzcash/zcash_proofs",
     "zcash_protocol": repo_root / "lrz/librustzcash/components/zcash_protocol",
 }
-entries = "".join(
-    f'{name} = {{ path = "{path}" }}\n' for name, path in patches.items()
-)
+if patch_mode == "git":
+    entries = "".join(
+        f'{name} = {{ git = "{git_url}", rev = "{git_rev}" }}\n'
+        for name in patches
+    )
+else:
+    entries = "".join(
+        f'{name} = {{ path = "{path}" }}\n' for name, path in patches.items()
+    )
 
 heading = "[patch.crates-io]"
 if heading in text:
@@ -106,13 +125,14 @@ cargo metadata \
   --format-version 1 \
   --locked > "$metadata"
 
-python3 - "$metadata" "$repo_root" <<'PY'
+python3 - "$metadata" "$repo_root" "$patch_mode" "$git_url" "$git_rev" <<'PY'
 import json
 import sys
 from pathlib import Path
 
 metadata_path = Path(sys.argv[1])
 repo_root = Path(sys.argv[2]).resolve()
+patch_mode, git_url, git_rev = sys.argv[3:]
 patched_names = {
     "halo2_gadgets",
     "halo2_legacy_pdqsort",
@@ -145,7 +165,13 @@ resolved_by_name = {
 for name, packages in resolved_by_name.items():
     for package in packages:
         manifest_path = Path(package["manifest_path"]).resolve()
-        if package["source"] is not None or repo_root not in manifest_path.parents:
+        source = package["source"]
+        if patch_mode == "git":
+            expected_prefix = f"git+{git_url}?rev={git_rev}#"
+            valid_origin = source is not None and source.startswith(expected_prefix)
+        else:
+            valid_origin = source is None and repo_root in manifest_path.parents
+        if not valid_origin:
             raise SystemExit(
                 f"resolved {name} outside wallet-libraries: {package['id']}"
             )

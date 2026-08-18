@@ -30,3 +30,6 @@ jobs:
 
       - name: Check zcash_voting against synced sources
         run: ./scripts/verify-zcash-voting.sh
+
+      - name: Check the consumer Git patch layout
+        run: ./scripts/verify-zcash-voting.sh --git-source
