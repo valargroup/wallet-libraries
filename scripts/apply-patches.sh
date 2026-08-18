@@ -7,13 +7,21 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 crate_path="${1:-}"
+vendored_directory="$(python3 - "$repo_root/manifests/sources.toml" <<'PY'
+import sys
+import tomllib
+
+with open(sys.argv[1], "rb") as manifest_file:
+    print(tomllib.load(manifest_file)["layout"]["vendored_directory"])
+PY
+)"
 
 if [[ -z "$crate_path" ]]; then
   echo "usage: $0 <crate-directory-name>" >&2
   exit 2
 fi
 
-source_dir="$repo_root/crates/$crate_path"
+source_dir="$repo_root/$vendored_directory/$crate_path"
 patch_dir="$repo_root/patches/$crate_path"
 
 if [[ ! -d "$source_dir" ]]; then

@@ -81,11 +81,13 @@ def main(argv: list[str]) -> int:
 
     repo_root = Path(argv[1])
     with (repo_root / "manifests" / "sources.toml").open("rb") as manifest_file:
-        crates = tomllib.load(manifest_file)["crate"]
+        manifest = tomllib.load(manifest_file)
+    crates = manifest["crate"]
+    vendored_root = repo_root / manifest["layout"]["vendored_directory"]
 
     renamed: dict[str, str] = {}
     for crate in crates:
-        manifest_path = repo_root / "crates" / crate["path"] / "Cargo.toml"
+        manifest_path = vendored_root / crate["path"] / "Cargo.toml"
         if not manifest_path.is_file():
             raise SystemExit(f"vendored crate is missing: {manifest_path}")
         if "package" not in crate:
@@ -95,9 +97,7 @@ def main(argv: list[str]) -> int:
         print(f"renamed {crate['path']} -> {crate['package']}")
 
     for crate in crates:
-        link_vendored_paths(
-            repo_root / "crates" / crate["path"] / "Cargo.toml", renamed
-        )
+        link_vendored_paths(vendored_root / crate["path"] / "Cargo.toml", renamed)
 
     return 0
 

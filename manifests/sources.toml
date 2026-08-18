@@ -13,6 +13,16 @@
 # ordering. `allow_prerelease` decides whether the scheduled discovery job may
 # propose a prerelease tag; a manual override can always pin one.
 
+# Repository layout. `vendored_directory` holds the generated forks; the sync
+# script owns it completely and deletes it before every extraction, so nothing
+# hand-written may live there. `extra_members` are hand-written workspace
+# members that sync never touches: the compatibility facade, and new Zakura
+# work such as the PIR-based sync engine.
+[layout]
+vendored_directory = "librustzcash"
+# `zakura/` members are added here as they are written.
+extra_members = ["compat"]
+
 [[source]]
 name = "librustzcash"
 url = "https://github.com/zcash/librustzcash.git"

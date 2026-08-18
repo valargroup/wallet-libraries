@@ -6,7 +6,9 @@ on:
       - ".github/workflows/verify.yml"
       - "Cargo.lock"
       - "Cargo.toml"
-      - "crates/**"
+      - "compat/**"
+      - "librustzcash/**"
+      - "zakura/**"
       - "manifests/**"
       - "patches/**"
       - "scripts/**"
@@ -29,8 +31,20 @@ jobs:
       - name: Check the wallet layer against the Zakura crypto stack
         run: ./scripts/verify-zakura-graph.sh
 
+  compat-modes:
+    # The facade selects between the two stacks, so it is built both ways and
+    # each build is checked for crates from the other one.
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out wallet libraries
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Build the facade against each backend
+        run: ./scripts/verify-compat-modes.sh
+
   reproducible:
-    # `crates/` and the root `Cargo.toml` are generated output: the pinned
+    # `librustzcash/` and the root `Cargo.toml` are generated output: the pinned
     # upstream commit, plus the rename rules, plus the ordered patch series.
     # Regenerating must be a no-op, otherwise a hand edit is sitting in the
     # tree that the next upstream sync would silently discard.
@@ -45,16 +59,16 @@ jobs:
 
       - name: Fail on drift between the tree and its inputs
         run: |
-          if ! git diff --quiet -- crates Cargo.toml manifests; then
+          if ! git diff --quiet -- librustzcash Cargo.toml manifests; then
             echo "the generated tree does not match its pinned inputs:" >&2
-            git --no-pager diff --stat -- crates Cargo.toml manifests >&2
+            git --no-pager diff --stat -- librustzcash Cargo.toml manifests >&2
             echo >&2
             echo "Move the change into patches/<crate>/ and regenerate." >&2
             exit 1
           fi
           # `--ignored` matters here: an upstream `.gitignore` inside a
           # vendored crate can quietly keep a synced file out of the commit.
-          stray="$(git status --porcelain --untracked-files=all --ignored=matching -- crates)"
+          stray="$(git status --porcelain --untracked-files=all --ignored=matching -- librustzcash)"
           if [[ -n "$stray" ]]; then
             echo "sync produced files that are untracked or ignored:" >&2
             echo "$stray" >&2

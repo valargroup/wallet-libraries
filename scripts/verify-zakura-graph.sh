@@ -14,8 +14,20 @@ manifest="$repo_root/manifests/sources.toml"
 
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$repo_root/target/verify-zakura-graph}"
 
+# The facade is excluded here and checked by verify-compat-modes.sh instead:
+# its backend features are mutually exclusive, so `--all-features` cannot build
+# it, and its optional upstream dependencies would appear in this graph.
+facade="$(python3 - "$repo_root/compat/Cargo.toml" <<'PY'
+import sys
+import tomllib
+
+with open(sys.argv[1], "rb") as manifest_file:
+    print(tomllib.load(manifest_file)["package"]["name"])
+PY
+)"
+
 cargo check --manifest-path "$repo_root/Cargo.toml" \
-  --workspace --all-targets --all-features --locked
+  --workspace --exclude "$facade" --all-targets --all-features --locked
 
 cargo metadata --manifest-path "$repo_root/Cargo.toml" \
   --format-version 1 --all-features \
@@ -37,8 +49,25 @@ expected_packages = {
     crate.get("package", crate["path"]) for crate in manifest["crate"]
 }
 
+packages = {package["id"]: package for package in metadata["packages"]}
+nodes = {node["id"]: node for node in metadata["resolve"]["nodes"]}
+
+reachable: set[str] = set()
+queue = [
+    package_id
+    for package_id, package in packages.items()
+    if package["name"] in expected_packages
+]
+while queue:
+    package_id = queue.pop()
+    if package_id in reachable:
+        continue
+    reachable.add(package_id)
+    queue.extend(dependency["pkg"] for dependency in nodes[package_id]["deps"])
+
 versions = defaultdict(set)
-for package in metadata["packages"]:
+for package_id in reachable:
+    package = packages[package_id]
     versions[package["name"]].add(package["version"])
 
 problems = []
@@ -63,6 +92,9 @@ if problems:
     raise SystemExit(1)
 
 zakura = sorted(name for name in versions if name.startswith("zakura-"))
-print(f"verified: {len(zakura)} zakura packages, no crates.io originals")
+print(
+    f"verified: {len(versions)} packages reachable from the vendored crates, "
+    f"{len(zakura)} of them zakura, no crates.io originals"
+)
 print("  " + " ".join(zakura))
 PY

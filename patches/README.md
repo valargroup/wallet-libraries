@@ -1,10 +1,11 @@
 # Maintaining source patches
 
-`crates/` is generated output. Do not commit a manual edit there without a
+`librustzcash/` is generated output. Do not commit a manual edit there without a
 corresponding ordered patch in this directory: the next upstream sync replaces
 each crate directory before reapplying its patch series, and CI regenerates the
 tree on every pull request and fails if the result differs from what is
-committed.
+committed. Hand-written code lives in `compat/` and `zakura/`, which sync
+never touches.
 
 There are currently **no patches**. The Zakura rewiring is expressed entirely
 as dependency renames in `manifests/sources.toml`, which the generated root
@@ -80,7 +81,7 @@ git status --short
 ```
 
 Commit both the new file under `patches/<crate>/` and the regenerated files
-under `crates/<crate>/`.
+under `librustzcash/<crate>/`.
 
 ## Updating an existing patch
 
@@ -102,7 +103,7 @@ If a patch no longer applies:
    patch and sync again;
 2. otherwise regenerate it against the new pinned source, preserving its intent.
 
-Never resolve a sync failure by editing `crates/` alone; that edit disappears at
+Never resolve a sync failure by editing `librustzcash/` alone; that edit disappears at
 the next sync.
 
 ## What does not belong here

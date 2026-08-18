@@ -16,11 +16,11 @@ alongside their Zakura forks. This repository closes that gap.
 
 | Directory | Published as | Forked from |
 | --- | --- | --- |
-| `crates/pczt` | `zakura-pczt` | `zcash/librustzcash` |
-| `crates/zcash_client_backend` | `zakura-client-backend` | `zcash/librustzcash` |
-| `crates/zcash_client_sqlite` | `zakura-client-sqlite` | `zcash/librustzcash` |
-| `crates/zcash_pool_migration` | `zakura-pool-migration` | `zcash/librustzcash` |
-| `crates/zcash_pool_migration_memory` | not published | `zcash/librustzcash` |
+| `librustzcash/pczt` | `zakura-pczt` | `zcash/librustzcash` |
+| `librustzcash/zcash_client_backend` | `zakura-client-backend` | `zcash/librustzcash` |
+| `librustzcash/zcash_client_sqlite` | `zakura-client-sqlite` | `zcash/librustzcash` |
+| `librustzcash/zcash_pool_migration` | `zakura-pool-migration` | `zcash/librustzcash` |
+| `librustzcash/zcash_pool_migration_memory` | not published | `zcash/librustzcash` |
 
 Directory names and library target names keep their upstream spelling, so crate
 sources and `use` paths are untouched; only the package name changes. This is
@@ -37,6 +37,22 @@ consumer. `zcash_address`, `zip321`, `zcash_protocol`, `zcash_transparent`,
 test-only path dev-dependency of `zcash_pool_migration`, and Cargo drops
 path-only dev-dependencies when publishing, so it is never published and keeps
 its upstream name.
+
+## Layout
+
+Three directories, following the split Dev sketched:
+
+```text
+librustzcash/   forked upstream crates   generated; sync deletes and rewrites it
+compat/         the backend selector     hand-written
+zakura/         new Zakura work          hand-written; empty for now
+```
+
+Only `librustzcash/` and the root `Cargo.toml` are generated. Anything
+hand-written goes in `compat/` or `zakura/` and is listed in
+`layout.extra_members` in `manifests/sources.toml`, which the workspace
+generator appends to the members it produces — a crate placed under
+`librustzcash/` would be deleted by the next sync.
 
 ## How the rewiring works
 
@@ -69,6 +85,36 @@ original of a forked crate is present, and no vendored crate appears twice.
 Compiling alone would not prove this — an edge that escapes the rewiring builds
 fine here and fails later where the two type families meet.
 
+## Selecting a backend
+
+`compat/` holds `zakura-wallet-deps`, which exists for code that has to build
+for **both** ZODL and Vizor from one source tree — `zcash_voting` and the vote
+commitment tree. It re-exports one family under stable names:
+
+```rust
+use zakura_wallet_deps::{client_backend, orchard};
+```
+
+```toml
+# ZODL: upstream, the default
+zakura-wallet-deps = "0.1"
+
+# Vizor: the forks
+zakura-wallet-deps = { version = "0.1", default-features = false, features = ["zakura"] }
+```
+
+The two features are mutually exclusive. Cargo features are additive and there
+is no way to enable a dependency when a feature is *off*, so the upstream
+family needs its own named feature rather than being the implicit
+`not(zakura)` case — which is why selecting `zakura` also requires
+`default-features = false`. Enabling both, or neither, is a compile error.
+
+`scripts/verify-compat-modes.sh` builds it each way and fails if a crate from
+the other family appears, or if the mutually-exclusive rules stop holding.
+
+An end consumer that builds for exactly one stack does not need this crate at
+all — it declares the packages it wants directly, as below.
+
 ## Consume from a wallet
 
 Until these crates are published, pin them by git revision. The dependency keys
@@ -93,7 +139,7 @@ upstream crates.
 The script extracts the vendored crate directories and the upstream workspace
 manifest at the pinned commit, regenerates the root `Cargo.toml` through
 `scripts/generate-workspace.py`, applies the package renames, and reapplies any
-patch series. `crates/` and `Cargo.toml` are generated output; CI regenerates
+patch series. `librustzcash/` and `Cargo.toml` are generated output; CI regenerates
 them on every pull request and fails on drift.
 
 ## Automatic upstream updates
@@ -117,19 +163,22 @@ workflows, so a sync pull request shows no checks even though the sync job
 verified the result before opening it. Setting an `UPSTREAM_SYNC_TOKEN` secret
 that may open pull requests makes `verify.yml` run on the branch as well.
 
-## Layout
+## Files
 
 ```text
-crates/                 vendored wallet-layer crates (generated)
+librustzcash/           vendored wallet-layer crates (generated)
+compat/                 zakura-wallet-deps, the backend selector
+zakura/                 new Zakura work
 Cargo.toml              workspace manifest (generated)
 patches/                ordered patches per crate, relative to the crate root
-manifests/sources.toml  upstream pin, vendored crate list, rewiring rules
+manifests/sources.toml  layout, upstream pin, crate list, rewiring rules
 scripts/
   sync-upstream.sh            regenerate everything from the pin
   generate-workspace.py       root manifest from the upstream workspace
   apply-renames.py            package renames and sibling path links
   apply-patches.sh            ordered patch series for one crate
   verify-zakura-graph.sh      build and graph-purity check
+  verify-compat-modes.sh      build the facade against each backend
   discover-upstream-updates.py
 ```
 
