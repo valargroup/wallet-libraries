@@ -1,0 +1,22 @@
+# Local sibling checkout: append these entries to zcash_voting/Cargo.toml.
+[patch.crates-io]
+pczt = { path = "../wallet-libraries/lrz/librustzcash/pczt" }
+zcash_client_backend = { path = "../wallet-libraries/lrz/librustzcash/zcash_client_backend" }
+zcash_client_sqlite = { path = "../wallet-libraries/lrz/librustzcash/zcash_client_sqlite" }
+zcash_keys = { path = "../wallet-libraries/lrz/librustzcash/zcash_keys" }
+zcash_primitives = { path = "../wallet-libraries/lrz/librustzcash/zcash_primitives" }
+zcash_protocol = { path = "../wallet-libraries/lrz/librustzcash/components/zcash_protocol" }
+orchard = { path = "../wallet-libraries/lrz/orchard" }
+
+# For a remote consumer, replace each `path` with the same repository pin:
+#
+# pczt = { git = "https://github.com/valargroup/wallet-libraries.git", rev = "<commit>" }
+# zcash_client_backend = { git = "https://github.com/valargroup/wallet-libraries.git", rev = "<commit>" }
+# zcash_client_sqlite = { git = "https://github.com/valargroup/wallet-libraries.git", rev = "<commit>" }
+# zcash_keys = { git = "https://github.com/valargroup/wallet-libraries.git", rev = "<commit>" }
+# zcash_primitives = { git = "https://github.com/valargroup/wallet-libraries.git", rev = "<commit>" }
+# zcash_protocol = { git = "https://github.com/valargroup/wallet-libraries.git", rev = "<commit>" }
+# orchard = { git = "https://github.com/valargroup/wallet-libraries.git", rev = "<commit>" }
+#
+# Cargo traverses a git repository to find matching package names, so the
+# nested lrz/ directories do not need to be specified in the git form.

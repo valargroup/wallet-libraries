@@ -1,0 +1,22 @@
+# Upstream trees vendored into this repository.
+#
+# `ref` is the human-readable release tag. `commit` is the peeled commit that
+# the sync script verifies, so retagging cannot silently change the source.
+
+[[source]]
+name = "librustzcash"
+url = "https://github.com/zcash/librustzcash.git"
+ref = "zcash_client_sqlite-0.22.0-rc.7"
+commit = "34f2b1e810ac8d00e671f0d254c7af7048c8985c"
+destination = "lrz/librustzcash"
+
+[[source]]
+name = "orchard"
+url = "https://github.com/zcash/orchard.git"
+ref = "0.15.5"
+commit = "29d1d55db62153dcaeef8ef631c8991c53ed1248"
+destination = "lrz/orchard"
+
+[consumer.zcash_voting]
+url = "https://github.com/valargroup/zcash_voting.git"
+rev = "db360aeecc6e6232316572f0c2d364786d4c4aef"
