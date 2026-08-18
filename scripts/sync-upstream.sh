@@ -2,8 +2,9 @@
 set -euo pipefail
 
 # Regenerate the vendored wallet-layer crates from the pinned librustzcash
-# release. Everything under crates/, plus the root Cargo.toml, is generated
-# output: this script is the only supported way to produce it.
+# release. The vendored directory named in manifests/sources.toml, plus the
+# root Cargo.toml, is generated output: this script is the only supported way
+# to produce it. Hand-written members (compat/, zakura/) are never touched.
 #
 #   ./scripts/sync-upstream.sh                              refresh the pin
 #   ./scripts/sync-upstream.sh librustzcash=<tag-or-commit> move the pin
@@ -35,6 +36,16 @@ for source in manifest["source"]:
     if any("\t" in value or "\n" in value for value in fields):
         raise SystemExit("source manifest fields may not contain tabs or newlines")
     print("\t".join(fields))
+PY
+}
+
+read_layout() {
+  python3 - "$manifest" <<'PY'
+import sys
+import tomllib
+
+with open(sys.argv[1], "rb") as manifest_file:
+    print(tomllib.load(manifest_file)["layout"]["vendored_directory"])
 PY
 }
 
@@ -88,6 +99,7 @@ path.write_text("".join(blocks))
 PY
 }
 
+vendored_directory="$(read_layout)"
 mapfile -t crate_paths < <(read_crate_paths)
 
 while IFS=$'\t' read -r name url pinned_ref pinned_commit; do
@@ -117,9 +129,9 @@ while IFS=$'\t' read -r name url pinned_ref pinned_commit; do
       echo "crate is not present in $name at $ref: $crate_path" >&2
       exit 1
     fi
-    rm -rf "${repo_root:?}/crates/${crate_path:?}"
-    mkdir -p "$repo_root/crates"
-    mv "$extract_dir/$crate_path" "$repo_root/crates/$crate_path"
+    rm -rf "${repo_root:?}/${vendored_directory:?}/${crate_path:?}"
+    mkdir -p "$repo_root/$vendored_directory"
+    mv "$extract_dir/$crate_path" "$repo_root/$vendored_directory/$crate_path"
   done
 
   python3 "$repo_root/scripts/generate-workspace.py" \

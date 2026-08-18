@@ -68,6 +68,9 @@ jobs:
       - name: Verify the Zakura-only dependency graph
         run: ./scripts/verify-zakura-graph.sh
 
+      - name: Verify both facade backends
+        run: ./scripts/verify-compat-modes.sh
+
       - name: Open upstream sync pull request
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
         with:
@@ -91,7 +94,8 @@ jobs:
 
             - the whole workspace checks with all targets and all features;
             - no crates.io original of a `zakura-*` fork entered the graph;
-            - every vendored crate resolves to exactly one copy.
+            - every vendored crate resolves to exactly one copy;
+            - the facade still builds against both backends.
 
             Run:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
