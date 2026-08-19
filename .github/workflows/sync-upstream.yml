@@ -1,0 +1,104 @@
+name: Sync upstream releases
+
+on:
+  schedule:
+    # Daily upstream tag check. Scheduled runs only fire on the default branch.
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+    inputs:
+      librustzcash_ref:
+        description: "zcash/librustzcash tag or commit (blank discovers the newest release)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      targets: ${{ steps.discover.outputs.targets }}
+    steps:
+      - name: Check out wallet libraries
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Find sources with a newer upstream release
+        id: discover
+        env:
+          LIBRUSTZCASH_REF: ${{ inputs.librustzcash_ref }}
+        run: |
+          args=()
+          if [[ -n "$LIBRUSTZCASH_REF" ]]; then
+            args+=(--override "librustzcash=$LIBRUSTZCASH_REF")
+          fi
+          targets="$(./scripts/discover-upstream-updates.py "${args[@]}")"
+          echo "targets=$targets" >> "$GITHUB_OUTPUT"
+
+  sync:
+    needs: discover
+    if: needs.discover.outputs.targets != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      pull-requests: write
+    strategy:
+      # One pull request per source keeps a failing update from blocking the
+      # other, and keeps each branch reviewable on its own.
+      fail-fast: false
+      matrix:
+        target: ${{ fromJson(needs.discover.outputs.targets) }}
+    concurrency:
+      group: upstream-sync-${{ matrix.target.name }}
+      cancel-in-progress: true
+    steps:
+      - name: Check out wallet libraries
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Sync ${{ matrix.target.name }}
+        env:
+          # Passed through the environment: a tag name is upstream-controlled
+          # input and must not be interpolated into the shell command itself.
+          SOURCE_NAME: ${{ matrix.target.name }}
+          SOURCE_REF: ${{ matrix.target.ref }}
+        run: ./scripts/sync-upstream.sh "$SOURCE_NAME=$SOURCE_REF"
+
+      - name: Verify the Zakura-only dependency graph
+        run: ./scripts/verify-zakura-graph.sh
+
+      - name: Verify both facade backends
+        run: ./scripts/verify-wallet-lib-modes.sh
+
+      - name: Open upstream sync pull request
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
+        with:
+          # `UPSTREAM_SYNC_TOKEN` is optional. Pull requests created with the
+          # default `GITHUB_TOKEN` do not trigger `verify.yml`, so without it a
+          # sync pull request shows no checks even though this job verified the
+          # result. Set it to a token that may open pull requests to get the
+          # same verification re-run on the branch, independently of this job.
+          token: ${{ secrets.UPSTREAM_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
+          # One long-lived branch per source: a newer upstream tag updates the
+          # open pull request instead of opening a second one.
+          branch: automation/upstream-sync/${{ matrix.target.name }}
+          delete-branch: true
+          commit-message: "chore: sync ${{ matrix.target.name }} to ${{ matrix.target.ref }}"
+          title: "chore: sync ${{ matrix.target.name }} to ${{ matrix.target.ref }}"
+          body: |
+            Moves the pinned `${{ matrix.target.name }}` tree to
+            `${{ matrix.target.ref }}` and reapplies the voting patch set.
+
+            Verified before this pull request was written:
+
+            - the whole workspace checks with all targets and all features;
+            - no crates.io original of a `zakura-*` fork entered the graph;
+            - every vendored crate resolves to exactly one copy;
+            - the facade still builds against both backends.
+
+            Run:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Consumers pin these crates by git revision until they are
+            published, so their pins need moving after this merges.
