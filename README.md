@@ -19,8 +19,6 @@ alongside their Zakura forks. This repository closes that gap.
 | `librustzcash/pczt` | `zakura-pczt` | `zcash/librustzcash` |
 | `librustzcash/zcash_client_backend` | `zakura-client-backend` | `zcash/librustzcash` |
 | `librustzcash/zcash_client_sqlite` | `zakura-client-sqlite` | `zcash/librustzcash` |
-| `librustzcash/zcash_pool_migration` | `zakura-pool-migration` | `zcash/librustzcash` |
-| `librustzcash/zcash_pool_migration_memory` | not published | `zcash/librustzcash` |
 
 Directory names and library target names keep their upstream spelling, so crate
 sources and `use` paths are untouched; only the package name changes. This is
@@ -33,10 +31,10 @@ cross the boundary are two different types, and the build only fails later, in a
 consumer. `zcash_address`, `zip321`, `zcash_protocol`, `zcash_transparent`,
 `zcash_encoding` and `equihash` therefore stay on crates.io.
 
-`zcash_pool_migration_memory` is the one exception to the naming rule: it is a
-test-only path dev-dependency of `zcash_pool_migration`, and Cargo drops
-path-only dev-dependencies when publishing, so it is never published and keeps
-its upstream name.
+`zcash_client_sqlite` upstream also depends on `zcash_pool_migration`. Vizor
+does not use the pool-migration engine, so this fork cuts that dependency
+instead of carrying the crate: the module and its tests are gone, the schema
+and its migrations are not, and an existing database still opens.
 
 ## Layout
 
@@ -211,6 +209,6 @@ Not yet moved to the Zakura organization, and none of these crates are
 published yet — only the `0.0.0` placeholders that hold their names.
 
 Every name is reserved in `zakura-core/reserved`: `zakura-pczt`,
-`zakura-client-backend`, `zakura-client-sqlite`, `zakura-pool-migration`, and
-`zakura-wallet-lib`. `zcash_pool_migration_memory` is never published, so it
-needs no name.
+`zakura-client-backend`, `zakura-client-sqlite`, and `zakura-wallet-lib`.
+`zakura-pool-migration` is also reserved, from when this fork still carried the
+pool-migration engine; the name is held in case it returns.
