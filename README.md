@@ -129,18 +129,42 @@ pczt = { git = "https://github.com/valargroup/wallet-libraries.git", rev = "<com
 The crypto stack comes from crates.io as `zakura-*`; do not also declare the
 upstream crates.
 
-## Sync an upstream release
+## Working on the fork
+
+`librustzcash/` is ours to change. Edit the files, commit, done — there is no
+regeneration step and no patch series to keep in sync.
+
+Upstream arrives as a merge. `vendor/librustzcash` is a branch holding pristine
+upstream, pruned to the crates we vendor, with their directories at its root.
+Moving to a new release updates that branch and merges it here:
 
 ```bash
-./scripts/sync-upstream.sh                                  # refresh the pin
-./scripts/sync-upstream.sh librustzcash=<tag-or-commit>     # move the pin
+./scripts/sync-upstream.sh                    # re-check the pinned release
+./scripts/sync-upstream.sh <tag-or-commit>    # move to a new release
 ```
 
-The script extracts the vendored crate directories and the upstream workspace
-manifest at the pinned commit, regenerates the root `Cargo.toml` through
-`scripts/generate-workspace.py`, applies the package renames, and reapplies any
-patch series. `librustzcash/` and `Cargo.toml` are generated output; CI regenerates
-them on every pull request and fails on drift.
+Because the vendor branch is unmodified upstream, the merge base is a real
+upstream tree and git can tell our changes from theirs. Conflicts happen — that
+is what carrying real changes costs — and the script stops and leaves the merge
+in place rather than guessing. Finish it, then re-run the verification scripts.
+
+The root `Cargo.toml` stays generated, from the upstream workspace manifest the
+vendor branch carries as `librustzcash/upstream-workspace.toml`. That is what
+keeps the dependency rewiring out of merge territory: upstream bumps versions
+on the same lines our renames touch, and generating the file means the two
+never meet.
+
+CI checks provenance rather than regenerating — the vendor commit recorded in
+`manifests/sources.toml` must be an ancestor of `HEAD` — so a change pasted
+into `librustzcash/` without a merge fails the build.
+
+Not every upstream tag is consumable. Release candidates are cut before their
+sibling crates are published, and upstream builds them against in-repo paths,
+so a tag can call an API that does not exist in the crates.io release we
+resolve. `zcash_client_sqlite-0.22.0-rc.8` is exactly that: it calls
+`zcash_protocol::TxId::from_hex`, unpublished at the time of writing, so the
+pin stays at `-rc.7`. The verification scripts are the gate; a sync that fails
+them does not become a pull request.
 
 ## Automatic upstream updates
 
@@ -166,19 +190,18 @@ that may open pull requests makes `verify.yml` run on the branch as well.
 ## Files
 
 ```text
-librustzcash/           vendored wallet-layer crates (generated)
+librustzcash/           forked wallet-layer crates, edited directly
 wallet-lib/             zakura-wallet-lib, the backend selector
 zakura/                 new Zakura work
 Cargo.toml              workspace manifest (generated)
-patches/                ordered patches per crate, relative to the crate root
 manifests/sources.toml  layout, upstream pin, crate list, rewiring rules
 scripts/
-  sync-upstream.sh            regenerate everything from the pin
+  sync-upstream.sh            move the vendor branch and merge it here
+  update-vendor-branch.sh     record an upstream release on the vendor branch
   generate-workspace.py       root manifest from the upstream workspace
-  apply-renames.py            package renames and sibling path links
-  apply-patches.sh            ordered patch series for one crate
   verify-zakura-graph.sh      build and graph-purity check
   verify-wallet-lib-modes.sh  build the facade against each backend
+  verify-vendor-ancestry.sh   the recorded vendor commit is an ancestor
   discover-upstream-updates.py
 ```
 

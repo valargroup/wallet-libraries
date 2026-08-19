@@ -56,6 +56,10 @@ jobs:
     steps:
       - name: Check out wallet libraries
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # The sync is a merge, so it needs history, and it pushes the vendor
+          # branch alongside the pull request branch.
+          fetch-depth: 0
 
       - name: Sync ${{ matrix.target.name }}
         env:
@@ -63,7 +67,12 @@ jobs:
           # input and must not be interpolated into the shell command itself.
           SOURCE_NAME: ${{ matrix.target.name }}
           SOURCE_REF: ${{ matrix.target.ref }}
-        run: ./scripts/sync-upstream.sh "$SOURCE_NAME=$SOURCE_REF"
+        run: ./scripts/sync-upstream.sh "$SOURCE_REF"
+
+      - name: Push the vendor branch
+        # The pull request's merge commit has a vendor-branch parent, so that
+        # branch has to exist on the remote for the history to resolve.
+        run: git push origin vendor/librustzcash
 
       - name: Verify the Zakura-only dependency graph
         run: ./scripts/verify-zakura-graph.sh
@@ -87,8 +96,9 @@ jobs:
           commit-message: "chore: sync ${{ matrix.target.name }} to ${{ matrix.target.ref }}"
           title: "chore: sync ${{ matrix.target.name }} to ${{ matrix.target.ref }}"
           body: |
-            Moves the pinned `${{ matrix.target.name }}` tree to
-            `${{ matrix.target.ref }}` and reapplies the voting patch set.
+            Merges `${{ matrix.target.ref }}` into the fork. A conflicting
+            merge fails this job instead of opening a pull request, and has to
+            be finished locally with `./scripts/sync-upstream.sh <ref>`.
 
             Verified before this pull request was written:
 
