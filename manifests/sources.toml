@@ -20,6 +20,12 @@
 # work such as the PIR-based sync engine.
 [layout]
 vendored_directory = "librustzcash"
+# Pristine upstream lives on its own branch, and releases arrive on `main` as
+# merges from it. `upstream_manifest` is upstream's workspace manifest, carried
+# under a name Cargo does not read: the root Cargo.toml is generated from it,
+# so the dependency rewiring never takes part in a merge.
+vendor_branch = "vendor/librustzcash"
+upstream_manifest = "librustzcash/upstream-workspace.toml"
 # `zakura/` members are added here as they are written.
 extra_members = ["wallet-lib"]
 # The backend selector. Named separately because the verification scripts have
