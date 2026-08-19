@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Write the root Cargo.toml from the upstream librustzcash workspace manifest.
 
-Usage: generate-workspace.py <upstream-root-Cargo.toml> <repo-root>
+Usage: generate-workspace.py <repo-root>
 
 The root manifest is generated output, not a hand-maintained file. Upstream
-owns the dependency versions that the vendored crates share, so regenerating it
-at sync time is what lets an upstream release flow in without a manual merge.
+owns the dependency versions the vendored crates share, and generating rather
+than merging this file is what keeps the Zakura rewiring out of every upstream
+merge: the rules live in manifests/sources.toml, and the manifest they are
+applied to arrives untouched on the vendor branch.
 
 Three rules are applied to `[workspace.dependencies]`:
 
@@ -60,15 +62,16 @@ def render(fields: dict[str, str]) -> str:
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) != 3:
+    if len(argv) != 2:
         print(__doc__.strip(), file=sys.stderr)
         return 2
 
-    upstream_manifest = Path(argv[1])
-    repo_root = Path(argv[2])
+    repo_root = Path(argv[1])
 
     with (repo_root / "manifests" / "sources.toml").open("rb") as manifest_file:
         manifest = tomllib.load(manifest_file)
+
+    upstream_manifest = repo_root / manifest["layout"]["upstream_manifest"]
 
     vendored = {
         crate["path"]: crate.get("package", crate["path"])
