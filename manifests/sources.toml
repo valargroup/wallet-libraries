@@ -62,7 +62,6 @@ path = "zcash_client_sqlite"
 package = "zakura-client-sqlite"
 
 # Not optional: `zcash_client_sqlite` takes this as a hard dependency.
-# NOTE: `zakura-pool-migration` is not yet reserved in `zakura-core/reserved`.
 [[crate]]
 path = "zcash_pool_migration"
 package = "zakura-pool-migration"

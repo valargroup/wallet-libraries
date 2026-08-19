@@ -184,6 +184,13 @@ scripts/
 
 ## Status
 
-Not yet moved to the Zakura organization, and not yet published.
-`zakura-pool-migration` still needs a name reservation in
-`zakura-core/reserved`; the other published names are already reserved there.
+Not yet moved to the Zakura organization, and none of these crates are
+published yet — only the `0.0.0` placeholders that hold their names.
+
+Every name the forked crates will publish under is reserved in
+`zakura-core/reserved`: `zakura-pczt`, `zakura-client-backend`,
+`zakura-client-sqlite`, and `zakura-pool-migration`.
+`zcash_pool_migration_memory` is never published, so it needs no name.
+
+`zakura-wallet-lib` is the one name still unreserved. Nothing consumes the
+crate yet, so renaming it stays cheap until it is published.
