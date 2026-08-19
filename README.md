@@ -143,8 +143,11 @@ Moving to a new release updates that branch and merges it here:
 
 Because the vendor branch is unmodified upstream, the merge base is a real
 upstream tree and git can tell our changes from theirs. Conflicts happen — that
-is what carrying real changes costs — and the script stops and leaves the merge
-in place rather than guessing. Finish it, then re-run the verification scripts.
+is what carrying real changes costs — and the script stops (exit status 2) and
+leaves the merge in place rather than guessing. Finish it, then re-run the
+verification scripts. The scheduled sync job commits that conflicted merge onto
+the automation branch and opens a **draft** pull request instead of failing
+silently.
 
 The root `Cargo.toml` stays generated, from the upstream workspace manifest the
 vendor branch carries as `librustzcash/upstream-workspace.toml`. That is what
@@ -174,7 +177,11 @@ version — and compares the highest semantic version against the current pin.
 
 A newer release is synced, verified, and raised as a pull request on the
 long-lived `automation/upstream-sync/librustzcash` branch. Nothing is
-auto-merged. The same discovery runs locally:
+auto-merged. If the merge conflicts, verification is skipped and a **draft**
+pull request is opened with the conflict markers committed, so someone can
+check out the branch and finish the merge. A sync that merges cleanly but fails
+verification still does not open a pull request. The same discovery runs
+locally:
 
 ```bash
 ./scripts/discover-upstream-updates.py

@@ -11,9 +11,10 @@ set -euo pipefail
 # merged into the current branch, letting git reconcile upstream's changes with
 # ours. Only the root Cargo.toml is still generated.
 #
-# A conflicting merge is left in place for a person to finish. That is the
-# expected outcome now and then — it is what carrying real changes costs — and
-# it is why this script stops rather than guessing.
+# A conflicting merge is left in place for a person to finish (exit status 2).
+# That is the expected outcome now and then — it is what carrying real changes
+# costs — and it is why this script stops rather than guessing. CI commits the
+# conflicted merge onto the automation branch and opens a draft pull request.
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 manifest="$repo_root/manifests/sources.toml"
@@ -50,7 +51,8 @@ if ! git -C "$repo_root" merge --no-edit -X "subtree=$vendored_directory" \
   echo "  python3 scripts/generate-workspace.py \"$repo_root\"" >&2
   echo "  ./scripts/verify-zakura-graph.sh" >&2
   echo "  ./scripts/verify-wallet-lib-modes.sh" >&2
-  exit 1
+  # Distinct from other failures so CI can open a draft pull request.
+  exit 2
 fi
 
 python3 "$repo_root/scripts/generate-workspace.py" "$repo_root"
